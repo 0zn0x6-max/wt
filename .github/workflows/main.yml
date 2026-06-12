@@ -1,0 +1,41 @@
+name: Build Unsigned IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build unsigned .app
+        run: |
+          xcodebuild archive \
+            -project KettlebellTimer.xcodeproj \
+            -scheme KettlebellTimer \
+            -destination "generic/platform=iOS" \
+            -archivePath $RUNNER_TEMP/KettlebellTimer.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package as IPA
+        run: |
+          mkdir -p $RUNNER_TEMP/Payload
+          cp -r "$RUNNER_TEMP/KettlebellTimer.xcarchive/Products/Applications/KettlebellTimer.app" \
+            $RUNNER_TEMP/Payload/
+          cd $RUNNER_TEMP
+          zip -r KettlebellTimer.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: KettlebellTimer-IPA
+          path: ${{ runner.temp }}/KettlebellTimer.ipa
+          retention-days: 30
