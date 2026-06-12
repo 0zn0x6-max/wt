@@ -26,36 +26,41 @@ class AudioEngine {
     
     func beep(freq: Double = 880, duration: Double = 0.15, volume: Float = 0.4) {
         DispatchQueue.global(qos: .userInteractive).async {
-            let sr = 44100.0
-            let count = Int(sr * duration)
-            var data = [Float](repeating: 0, count: count)
-            for i in 0..<count {
-                let t = Double(i) / sr
-                data[i] = sin(2.0 * .pi * freq * t) * volume
-            }
-            var format = AudioStreamBasicDescription(
-                mSampleRate: sr,
-                mFormatID: kAudioFormatLinearPCM,
-                mFormatFlags: kLinearPCMFormatFlagIsFloat | kAudioFormatFlagIsPacked,
-                mBytesPerPacket: 4,
-                mFramesPerPacket: 1,
-                mBytesPerFrame: 4,
-                mChannelsPerFrame: 1,
-                mBitsPerChannel: 32,
-                mReserved: 0
-            )
-            var buffer = AudioQueueBufferRef(bitPattern: 0)
-            var queue: AudioQueueRef?
-            AudioQueueNewOutput(&format, { _, _, _ in }, nil, nil, nil, 0, &queue)
-            guard let q = queue else { return }
-            AudioQueueAllocateBuffer(q, UInt32(count * 4), &buffer)
-            buffer?.pointee.mAudioDataByteSize = UInt32(count * 4)
-            buffer?.pointee.mAudioData.copyMemory(from: data, byteCount: count * 4)
-            AudioQueueEnqueueBuffer(q, buffer!, 0, nil)
-            AudioQueueStart(q, nil)
-            Thread.sleep(forTimeInterval: duration + 0.05)
-            AudioQueueDispose(q, true)
+            self._beepWork(freq: freq, duration: duration, volume: volume)
         }
+    }
+    
+    private func _beepWork(freq: Double, duration: Double, volume: Float) {
+        let sr: Double = 44100.0
+        let count: Int = Int(sr * duration)
+        var data = [Float](repeating: 0, count: count)
+        for i in 0..<count {
+            let t: Double = Double(i) / sr
+            data[i] = Float(sin(2.0 * Double.pi * freq * t)) * volume
+        }
+        var format = AudioStreamBasicDescription(
+            mSampleRate: sr,
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kLinearPCMFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+            mBytesPerPacket: 4,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 4,
+            mChannelsPerFrame: 1,
+            mBitsPerChannel: 32,
+            mReserved: 0
+        )
+        var buffer: AudioQueueBufferRef? = nil
+        var queue: AudioQueueRef? = nil
+        AudioQueueNewOutput(&format, { _, _, _ in }, nil, nil, nil, 0, &queue)
+        guard let q = queue else { return }
+        AudioQueueAllocateBuffer(q, UInt32(count * 4), &buffer)
+        guard let buf = buffer else { return }
+        buf.pointee.mAudioDataByteSize = UInt32(count * 4)
+        buf.pointee.mAudioData.copyMemory(from: data, byteCount: count * 4)
+        AudioQueueEnqueueBuffer(q, buf, 0, nil)
+        AudioQueueStart(q, nil)
+        Thread.sleep(forTimeInterval: duration + 0.05)
+        AudioQueueDispose(q, true)
     }
     
     func playTick(isLast: Bool) { beep(freq: isLast ? 1100 : 660, duration: 0.08) }
